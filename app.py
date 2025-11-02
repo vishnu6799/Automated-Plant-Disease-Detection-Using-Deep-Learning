@@ -3,55 +3,28 @@ import onnxruntime as ort
 import numpy as np
 from PIL import Image
 import cv2
-import os
 
-# Page configuration
-st.set_page_config(
-    page_title="Plant Disease Detector",
-    page_icon="🌿",
-    layout="centered"
-)
-
+st.set_page_config(page_title="Plant Disease Detector", page_icon="🌿")
 st.title("🌿 Plant Disease Detection")
 st.markdown("---")
 
-# Configuration
-CLASS_NAMES_PATH = "class_names.txt"
-MODEL_PATH = "plant_disease_model.onnx"
-IMG_SIZE = 224
-
+# Load model
 @st.cache_resource
 def load_model():
     try:
-        session = ort.InferenceSession(MODEL_PATH)
-        st.sidebar.success("✅ Model loaded!")
-        return session
-    except Exception as e:
-        st.sidebar.error(f"❌ Model error: {e}")
+        return ort.InferenceSession('plant_disease_model.onnx')
+    except:
         return None
 
+# Load class names  
 @st.cache_data
 def load_classes():
     try:
-        with open(CLASS_NAMES_PATH, 'r') as f:
+        with open('class_names.txt', 'r') as f:
             return [line.strip() for line in f.readlines()]
     except:
         return []
 
-def preprocess_image(image):
-    img_array = np.array(image)
-    img_array = cv2.resize(img_array, (IMG_SIZE, IMG_SIZE))
-    
-    if len(img_array.shape) == 2:
-        img_array = np.stack([img_array] * 3, axis=-1)
-    elif img_array.shape[2] == 4:
-        img_array = img_array[:, :, :3]
-    
-    img_array = img_array.astype(np.float32)
-    img_array = (img_array / 127.5) - 1.0
-    return img_array
-
-# Load resources
 model = load_model()
 class_names = load_classes()
 
@@ -69,9 +42,14 @@ if model and class_names:
         
         with st.spinner("🔍 Analyzing..."):
             try:
-                processed = preprocess_image(image.convert('RGB'))
-                input_data = np.expand_dims(processed, axis=0)
+                # Preprocess
+                img_array = np.array(image.convert('RGB'))
+                img_array = cv2.resize(img_array, (224, 224))
+                img_array = img_array.astype(np.float32)
+                img_array = (img_array / 127.5) - 1.0
+                input_data = np.expand_dims(img_array, axis=0)
                 
+                # Predict
                 predictions = model.run([output_name], {input_name: input_data})[0]
                 pred_idx = np.argmax(predictions[0])
                 confidence = np.max(predictions[0]) * 100
